@@ -15,6 +15,22 @@ import ProductModal from "../components/ProductModal";
 import { addProductToCartAsync } from "../slices/cartSlice";
 import { useActivity } from "../hooks/useActivity";
 import { toast } from "react-toastify";
+import Dialog from "@mui/material/Dialog";
+import AddIcon from "@mui/icons-material/Add";
+import CreateProductForm from "../components/CreateProductForm";
+import IconButton from "@mui/material/IconButton";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import axios from "axios";
+import {
+  updateLocalProduct,
+  deleteLocalProduct,
+  updateProduct,
+  deleteProduct,
+} from "../slices/productsSlice";
 
 const PAGE_SIZE = 9;
 
@@ -26,12 +42,19 @@ export default function Products() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [selectedProductId, setSelectedProductId] = useState(null);
+  const [openCreate, setOpenCreate] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [deletingProduct, setDeletingProduct] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     dispatch(fetchProductsAsync());
   }, [dispatch]);
 
-  const filtered = products.filter((p) => {
+  const sortedProducts = [...products].sort((a, b) => b.id - a.id);
+
+  const filtered = sortedProducts.filter((p) => {
     const term = search.toLowerCase();
     return (
       p.title.toLowerCase().includes(term) ||
@@ -62,7 +85,7 @@ export default function Products() {
 
   return (
     <div className="flex flex-col h-full p-4">
-      <div className="mb-4 mt-4 w-full flex justify-center lg:justify-end">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 mt-4 w-full gap-2">
         <TextField
           label="Search products"
           variant="outlined"
@@ -74,6 +97,15 @@ export default function Products() {
           }}
           className="bg-white w-full max-w-md"
         />
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          className="!bg-blue-600 !hover:bg-blue-700 !text-white font-semibold rounded-lg w-full sm:w-auto"
+          onClick={() => setOpenCreate(true)}
+        >
+          Create Product
+        </Button>
       </div>
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <Pagination
@@ -92,6 +124,7 @@ export default function Products() {
               <Card
                 key={product.id}
                 className="flex flex-col justify-between h-full w-full max-w-[250px] mx-auto cursor-pointer"
+                style={{ minHeight: 300, maxHeight: 320 }}
                 onClick={() => {
                   setSelectedProductId(product.id);
                   trackViewActivity(product);
@@ -99,12 +132,15 @@ export default function Products() {
               >
                 <CardMedia
                   component="img"
-                  style={{ height: 160, objectFit: "contain" }}
+                  style={{ height: 100, objectFit: "contain" }}
                   image={product.image}
                   alt={product.title}
                   className="bg-gray-50"
                 />
-                <CardContent className="flex-1 p-2 flex flex-col">
+                <CardContent
+                  className="flex-1 p-1 flex flex-col"
+                  style={{ paddingBottom: 4 }}
+                >
                   <Typography
                     gutterBottom
                     variant="subtitle2"
@@ -138,7 +174,30 @@ export default function Products() {
                     ${product.price}
                   </Typography>
                 </CardContent>
-                <CardActions className="p-0">
+                <CardActions className="flex flex-col items-stretch gap-1 p-1 pt-0">
+                  <div className="flex flex-row justify-end gap-2 mb-2">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditForm(product);
+                        setEditingProduct(product);
+                      }}
+                      aria-label="edit"
+                    >
+                      <EditIcon fontSize="small" className="text-blue-600" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingProduct(product);
+                      }}
+                      aria-label="delete"
+                    >
+                      <DeleteIcon fontSize="small" className="text-red-600" />
+                    </IconButton>
+                  </div>
                   <Button
                     fullWidth
                     variant="contained"
@@ -160,6 +219,163 @@ export default function Products() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
+      <Dialog
+        open={openCreate}
+        onClose={() => setOpenCreate(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: "none",
+            boxShadow: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          },
+        }}
+        BackdropProps={{
+          style: {
+            background: "rgba(30, 41, 59, 0.35)", // blue-gray-900 with opacity
+            backdropFilter: "blur(2px)",
+          },
+        }}
+      >
+        <CreateProductForm />
+      </Dialog>
+      <Dialog
+        open={!!editingProduct}
+        onClose={() => setEditingProduct(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit Product</DialogTitle>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setEditLoading(true);
+            try {
+              let updated = { ...editForm };
+              if (editingProduct.isLocal) {
+                updateLocalProduct(updated);
+                dispatch(updateProduct(updated));
+              } else {
+                await axios.put(
+                  `https://fakestoreapi.com/products/${editingProduct.id}`,
+                  updated
+                );
+                dispatch(updateProduct(updated));
+              }
+              dispatch(fetchProductsAsync());
+              setEditingProduct(null);
+            } catch (err) {
+              toast.error("Failed to update product");
+            } finally {
+              setEditLoading(false);
+            }
+          }}
+        >
+          <DialogContent
+            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+          >
+            <TextField
+              label="Title"
+              value={editForm.title || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, title: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+            <TextField
+              label="Price"
+              type="number"
+              value={editForm.price || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, price: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+            <TextField
+              label="Description"
+              value={editForm.description || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, description: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+            <TextField
+              label="Category"
+              value={editForm.category || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, category: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+            <TextField
+              label="Image URL"
+              value={editForm.image || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, image: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setEditingProduct(null)}
+              disabled={editLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={editLoading}
+            >
+              {editLoading ? "Saving..." : "Save"}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+      <Dialog open={!!deletingProduct} onClose={() => setDeletingProduct(null)}>
+        <DialogTitle>Delete Product</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete <b>{deletingProduct?.title}</b>?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletingProduct(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={async () => {
+              try {
+                if (deletingProduct.isLocal) {
+                  deleteLocalProduct(deletingProduct.id);
+                  dispatch(deleteProduct(deletingProduct.id));
+                } else {
+                  await axios.delete(
+                    `https://fakestoreapi.com/products/${deletingProduct.id}`
+                  );
+                  dispatch(deleteProduct(deletingProduct.id));
+                }
+                dispatch(fetchProductsAsync());
+                setDeletingProduct(null);
+              } catch {
+                toast.error("Failed to delete product");
+              }
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

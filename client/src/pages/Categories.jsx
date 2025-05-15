@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCategoriesAsync } from "../slices/categoriesSlice";
-import { fetchProductsByCategoryAsync } from "../slices/productsSlice";
+import {
+  fetchProductsByCategoryAsync,
+  updateLocalProduct,
+  deleteLocalProduct,
+  updateProduct,
+  deleteProduct,
+  fetchProductsAsync,
+} from "../slices/productsSlice";
 import { useSearchParams } from "react-router-dom";
 import DashboardSkeleton from "../components/DashboardSkeleton";
 import Tabs from "@mui/material/Tabs";
@@ -19,6 +26,14 @@ import CardActions from "@mui/material/CardActions";
 import { addProductToCartAsync } from "../slices/cartSlice";
 import { useActivity } from "../hooks/useActivity";
 import { toast } from "react-toastify";
+import IconButton from "@mui/material/IconButton";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import axios from "axios";
 
 export default function Categories() {
   const dispatch = useDispatch();
@@ -33,6 +48,10 @@ export default function Categories() {
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [deletingProduct, setDeletingProduct] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     dispatch(fetchCategoriesAsync());
@@ -57,10 +76,11 @@ export default function Categories() {
     }
   }, [selectedCategory, byCategory, dispatch]);
 
-  const products = byCategory[selectedCategory] || [];
+  const products = [...(byCategory[selectedCategory] || [])].sort(
+    (a, b) => b.id - a.id
+  );
   const showSkeleton = !products.length && productsLoading;
 
-  // Search filter
   const filteredProducts = products.filter((p) => {
     const term = search.toLowerCase();
     return (
@@ -167,6 +187,7 @@ export default function Categories() {
             <Card
               key={product.id}
               className="flex flex-col justify-between h-full w-full max-w-[250px] mx-auto cursor-pointer"
+              style={{ minHeight: 300, maxHeight: 320 }}
               onClick={() => {
                 setSelectedProductId(product.id);
                 trackViewActivity(product);
@@ -174,12 +195,15 @@ export default function Categories() {
             >
               <CardMedia
                 component="img"
-                style={{ height: 160, objectFit: "contain" }}
+                style={{ height: 100, objectFit: "contain" }}
                 image={product.image}
                 alt={product.title}
                 className="bg-gray-50"
               />
-              <CardContent className="flex-1 p-2 flex flex-col">
+              <CardContent
+                className="flex-1 p-1 flex flex-col"
+                style={{ paddingBottom: 4 }}
+              >
                 <Typography
                   gutterBottom
                   variant="subtitle2"
@@ -213,7 +237,30 @@ export default function Categories() {
                   ${product.price}
                 </Typography>
               </CardContent>
-              <CardActions className="p-0">
+              <CardActions className="flex flex-col items-stretch gap-1 p-1 pt-0">
+                <div className="flex flex-row justify-end gap-2 mb-2">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditForm(product);
+                      setEditingProduct(product);
+                    }}
+                    aria-label="edit"
+                  >
+                    <EditIcon fontSize="small" className="text-blue-600" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingProduct(product);
+                    }}
+                    aria-label="delete"
+                  >
+                    <DeleteIcon fontSize="small" className="text-red-600" />
+                  </IconButton>
+                </div>
                 <Button
                   fullWidth
                   variant="contained"
@@ -234,6 +281,140 @@ export default function Categories() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
+      <Dialog
+        open={!!editingProduct}
+        onClose={() => setEditingProduct(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit Product</DialogTitle>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setEditLoading(true);
+            try {
+              let updated = { ...editForm };
+              if (editingProduct.isLocal) {
+                updateLocalProduct(updated);
+                dispatch(updateProduct(updated));
+              } else {
+                await axios.put(
+                  `https://fakestoreapi.com/products/${editingProduct.id}`,
+                  updated
+                );
+                dispatch(updateProduct(updated));
+              }
+              dispatch(fetchProductsAsync());
+              setEditingProduct(null);
+            } catch (err) {
+              toast.error("Failed to update product");
+            } finally {
+              setEditLoading(false);
+            }
+          }}
+        >
+          <DialogContent
+            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+          >
+            <TextField
+              label="Title"
+              value={editForm.title || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, title: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+            <TextField
+              label="Price"
+              type="number"
+              value={editForm.price || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, price: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+            <TextField
+              label="Description"
+              value={editForm.description || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, description: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+            <TextField
+              label="Category"
+              value={editForm.category || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, category: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+            <TextField
+              label="Image URL"
+              value={editForm.image || ""}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, image: e.target.value }))
+              }
+              fullWidth
+              required
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setEditingProduct(null)}
+              disabled={editLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={editLoading}
+            >
+              {editLoading ? "Saving..." : "Save"}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+      <Dialog open={!!deletingProduct} onClose={() => setDeletingProduct(null)}>
+        <DialogTitle>Delete Product</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete <b>{deletingProduct?.title}</b>?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletingProduct(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={async () => {
+              try {
+                if (deletingProduct.isLocal) {
+                  deleteLocalProduct(deletingProduct.id);
+                  dispatch(deleteProduct(deletingProduct.id));
+                } else {
+                  await axios.delete(
+                    `https://fakestoreapi.com/products/${deletingProduct.id}`
+                  );
+                  dispatch(deleteProduct(deletingProduct.id));
+                }
+                dispatch(fetchProductsAsync());
+                setDeletingProduct(null);
+              } catch {
+                toast.error("Failed to delete product");
+              }
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

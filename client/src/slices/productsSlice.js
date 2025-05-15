@@ -5,13 +5,36 @@ import {
   fetchProductById,
 } from "../api/products";
 
+function getLocalProducts() {
+  return JSON.parse(localStorage.getItem("localProducts") || "[]");
+}
+
+export function saveLocalProduct(product) {
+  const localProducts = getLocalProducts();
+  localProducts.push(product);
+  localStorage.setItem("localProducts", JSON.stringify(localProducts));
+}
+
+function groupByCategory(products) {
+  const byCategory = {};
+  for (const product of products) {
+    if (!byCategory[product.category]) {
+      byCategory[product.category] = [];
+    }
+    byCategory[product.category].push(product);
+  }
+  return byCategory;
+}
+
 export const fetchProductsAsync = createAsyncThunk(
   "products/fetchProducts",
   async (_, { getState }) => {
     const { products } = getState().products;
     if (products.length > 0) return products;
     const res = await fetchProducts();
-    return res.data;
+    const apiProducts = res.data;
+    const localProducts = getLocalProducts();
+    return [...apiProducts, ...localProducts];
   }
 );
 
@@ -39,17 +62,66 @@ export const fetchProductByIdAsync = createAsyncThunk(
   }
 );
 
+export function updateLocalProduct(updatedProduct) {
+  let localProducts = JSON.parse(localStorage.getItem("localProducts") || "[]");
+  localProducts = localProducts.map((p) =>
+    p.id === updatedProduct.id ? updatedProduct : p
+  );
+  localStorage.setItem("localProducts", JSON.stringify(localProducts));
+}
+
+export function deleteLocalProduct(id) {
+  let localProducts = JSON.parse(localStorage.getItem("localProducts") || "[]");
+  localProducts = localProducts.filter((p) => p.id !== id);
+  localStorage.setItem("localProducts", JSON.stringify(localProducts));
+}
+
 const productsSlice = createSlice({
   name: "products",
   initialState: { products: [], byCategory: {}, byId: {}, loading: false },
-  reducers: {},
+  reducers: {
+    addProduct: (state, action) => {
+      state.products.push(action.payload);
+      const cat = action.payload.category;
+      if (!state.byCategory[cat]) {
+        state.byCategory[cat] = [];
+      }
+      state.byCategory[cat].push(action.payload);
+    },
+    updateProduct: (state, action) => {
+      const idx = state.products.findIndex((p) => p.id === action.payload.id);
+      if (idx !== -1) {
+        state.products[idx] = action.payload;
+      }
+      // Update byCategory as well
+      const cat = action.payload.category;
+      if (state.byCategory[cat]) {
+        const catIdx = state.byCategory[cat].findIndex(
+          (p) => p.id === action.payload.id
+        );
+        if (catIdx !== -1) {
+          state.byCategory[cat][catIdx] = action.payload;
+        }
+      }
+    },
+    deleteProduct: (state, action) => {
+      state.products = state.products.filter((p) => p.id !== action.payload);
+      for (const cat in state.byCategory) {
+        state.byCategory[cat] = state.byCategory[cat].filter(
+          (p) => p.id !== action.payload
+        );
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchProductsAsync.pending, (state) => {
         state.loading = true;
       })
       .addCase(fetchProductsAsync.fulfilled, (state, action) => {
+        console.log("fetchProductsAsync fulfilled, payload:", action.payload);
         state.products = action.payload;
+        state.byCategory = groupByCategory(action.payload);
         state.loading = false;
       })
       .addCase(fetchProductsAsync.rejected, (state) => {
@@ -78,4 +150,6 @@ const productsSlice = createSlice({
   },
 });
 
+export const { addProduct, updateProduct, deleteProduct } =
+  productsSlice.actions;
 export default productsSlice.reducer;

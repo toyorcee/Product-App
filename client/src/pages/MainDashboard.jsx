@@ -38,13 +38,14 @@ export default function MainDashboard() {
     return <DashboardSkeleton />;
   }
 
-  const nigeriaTime = new Date(
-    now.getTime() + (1 - now.getTimezoneOffset() / 60) * 60 * 60 * 1000
-  );
+  const nigeriaTime = new Date(now.getTime());
   const hour = nigeriaTime.getHours();
   let greeting = "Good morning";
-  if (hour >= 12 && hour < 17) greeting = "Good afternoon";
-  else if (hour >= 17 || hour < 5) greeting = "Good evening";
+  if (hour >= 12 && hour < 17) {
+    greeting = "Good afternoon";
+  } else if (hour >= 17 || hour < 5) {
+    greeting = "Good evening";
+  }
 
   const fullName =
     user && user.name ? `${user.name.firstname} ${user.name.lastname}` : "User";
@@ -59,11 +60,12 @@ export default function MainDashboard() {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    hour12: true,
   });
 
   return (
     <div className="p-4">
-      <div className="w-full mb-6 shadow rounded-lg bg-white px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="w-full mb-6 shadow rounded-lg bg-white px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4">
         <div>
           <div className="text-2xl font-bold text-gray-800">
             {greeting}, {fullName}!
