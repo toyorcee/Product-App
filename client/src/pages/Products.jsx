@@ -31,12 +31,13 @@ import {
   updateProduct,
   deleteProduct,
 } from "../slices/productsSlice";
+import ImageIcon from "@mui/icons-material/Image";
 
 const PAGE_SIZE = 9;
 
 export default function Products() {
   const dispatch = useDispatch();
-  const { trackCartActivity, trackViewActivity } = useActivity();
+  const { trackCartActivity, trackViewActivity, trackActivity } = useActivity();
   const { products, loading } = useSelector((state) => state.products);
   const userId = useSelector((state) => state.user.user?.id || 3);
   const [page, setPage] = useState(1);
@@ -182,6 +183,7 @@ export default function Products() {
                         e.stopPropagation();
                         setEditForm(product);
                         setEditingProduct(product);
+                        console.log("Editing product:", product);
                       }}
                       aria-label="edit"
                     >
@@ -235,7 +237,7 @@ export default function Products() {
         }}
         BackdropProps={{
           style: {
-            background: "rgba(30, 41, 59, 0.35)", // blue-gray-900 with opacity
+            background: "rgba(30, 41, 59, 0.35)",
             backdropFilter: "blur(2px)",
           },
         }}
@@ -255,20 +257,41 @@ export default function Products() {
             setEditLoading(true);
             try {
               let updated = { ...editForm };
+              if (!updated.image || updated.image === "") {
+                toast.error("Image is required");
+                setEditLoading(false);
+                return;
+              }
               if (editingProduct.isLocal) {
                 updateLocalProduct(updated);
                 dispatch(updateProduct(updated));
               } else {
+                if (updated.image.startsWith("data:")) {
+                  toast.error("API products require a valid image URL");
+                  setEditLoading(false);
+                  return;
+                }
+                const apiPayload = {
+                  id: editingProduct.id,
+                  title: updated.title,
+                  price: parseFloat(updated.price),
+                  description: updated.description,
+                  category: updated.category,
+                  image: updated.image,
+                };
                 await axios.put(
                   `https://fakestoreapi.com/products/${editingProduct.id}`,
-                  updated
+                  apiPayload
                 );
                 dispatch(updateProduct(updated));
               }
+              trackActivity("update", `Updated product: ${updated.title}`);
+              toast.success("Product updated!");
               dispatch(fetchProductsAsync());
               setEditingProduct(null);
             } catch (err) {
               toast.error("Failed to update product");
+              console.error("Update error:", err);
             } finally {
               setEditLoading(false);
             }
@@ -277,8 +300,33 @@ export default function Products() {
           <DialogContent
             sx={{ display: "flex", flexDirection: "column", gap: 2 }}
           >
+            {editForm.image && (
+              <div style={{ textAlign: "center", marginBottom: 8 }}>
+                <img
+                  src={editForm.image}
+                  alt={editForm.title || "Product image"}
+                  style={{
+                    maxWidth: 120,
+                    maxHeight: 120,
+                    objectFit: "contain",
+                    borderRadius: 8,
+                    border: "1px solid #eee",
+                    background: "#fafafa",
+                  }}
+                />
+                {editForm.image.startsWith("data:") && editForm.imageName && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 0.5, display: "block" }}
+                  >
+                    {editForm.imageName}
+                  </Typography>
+                )}
+              </div>
+            )}
             <TextField
-              label="Title"
+              label="Title *"
               value={editForm.title || ""}
               onChange={(e) =>
                 setEditForm((f) => ({ ...f, title: e.target.value }))
@@ -287,7 +335,7 @@ export default function Products() {
               required
             />
             <TextField
-              label="Price"
+              label="Price *"
               type="number"
               value={editForm.price || ""}
               onChange={(e) =>
@@ -297,7 +345,7 @@ export default function Products() {
               required
             />
             <TextField
-              label="Description"
+              label="Description *"
               value={editForm.description || ""}
               onChange={(e) =>
                 setEditForm((f) => ({ ...f, description: e.target.value }))
@@ -306,7 +354,7 @@ export default function Products() {
               required
             />
             <TextField
-              label="Category"
+              label="Category *"
               value={editForm.category || ""}
               onChange={(e) =>
                 setEditForm((f) => ({ ...f, category: e.target.value }))
@@ -315,14 +363,63 @@ export default function Products() {
               required
             />
             <TextField
-              label="Image URL"
-              value={editForm.image || ""}
-              onChange={(e) =>
-                setEditForm((f) => ({ ...f, image: e.target.value }))
+              label="Image URL or Name *"
+              value={
+                editForm.image && editForm.image.startsWith("data:")
+                  ? editForm.imageName || ""
+                  : editForm.image || ""
               }
+              onChange={(e) => {
+                const val = e.target.value;
+                if (editForm.image && editForm.image.startsWith("data:")) {
+                  setEditForm((f) => ({ ...f, imageName: val }));
+                } else {
+                  setEditForm((f) => ({ ...f, image: val }));
+                }
+              }}
               fullWidth
               required
+              helperText={
+                editForm.image && editForm.image.startsWith("data:")
+                  ? `Current: Local image selected${
+                      editForm.imageName ? " (" + editForm.imageName + ")" : ""
+                    }`
+                  : "Enter a valid image URL"
+              }
             />
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<ImageIcon />}
+              sx={{ mt: 1, mb: 0, textTransform: "none" }}
+            >
+              {editForm.image && editForm.image.startsWith("data:")
+                ? "Change Image (Local)"
+                : "Upload Local Image"}
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error("Image size should be less than 5MB");
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setEditForm((f) => ({
+                        ...f,
+                        image: reader.result,
+                        imageName: file.name,
+                      }));
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              />
+            </Button>
           </DialogContent>
           <DialogActions>
             <Button

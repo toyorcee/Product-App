@@ -71,7 +71,7 @@ export default function MainDashboard() {
             {greeting}, {fullName}!
           </div>
           <div className="text-sm text-blue-500 mt-1">
-            Your product overview awaits you beautifully below.
+            Your products overview awaits you beautifully below.
           </div>
         </div>
         <div className="flex items-center space-x-4 mt-4 sm:mt-0">

@@ -34,11 +34,13 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import axios from "axios";
+import ImageIcon from "@mui/icons-material/Image";
 
 export default function Categories() {
   const dispatch = useDispatch();
   const { trackCartActivity, trackViewActivity, trackCategoryActivity } =
     useActivity();
+  const { trackActivity } = useActivity();
   const { categories, loading } = useSelector((state) => state.categories);
   const { byCategory, loading: productsLoading } = useSelector(
     (state) => state.products
@@ -294,20 +296,41 @@ export default function Categories() {
             setEditLoading(true);
             try {
               let updated = { ...editForm };
+              if (!updated.image || updated.image === "") {
+                toast.error("Image is required");
+                setEditLoading(false);
+                return;
+              }
               if (editingProduct.isLocal) {
                 updateLocalProduct(updated);
                 dispatch(updateProduct(updated));
               } else {
+                if (updated.image.startsWith("data:")) {
+                  toast.error("API products require a valid image URL");
+                  setEditLoading(false);
+                  return;
+                }
+                const apiPayload = {
+                  id: editingProduct.id,
+                  title: updated.title,
+                  price: parseFloat(updated.price),
+                  description: updated.description,
+                  category: updated.category,
+                  image: updated.image,
+                };
                 await axios.put(
                   `https://fakestoreapi.com/products/${editingProduct.id}`,
-                  updated
+                  apiPayload
                 );
                 dispatch(updateProduct(updated));
               }
+              trackActivity("update", `Updated product: ${updated.title}`);
+              toast.success("Product updated!");
               dispatch(fetchProductsAsync());
               setEditingProduct(null);
             } catch (err) {
               toast.error("Failed to update product");
+              console.error("Update error:", err);
             } finally {
               setEditLoading(false);
             }
@@ -355,13 +378,61 @@ export default function Categories() {
             />
             <TextField
               label="Image URL"
-              value={editForm.image || ""}
-              onChange={(e) =>
-                setEditForm((f) => ({ ...f, image: e.target.value }))
+              value={
+                editForm.image && !editForm.image.startsWith("data:")
+                  ? editForm.image
+                  : ""
               }
+              onChange={(e) => {
+                const val = e.target.value;
+                setEditForm((f) => ({ ...f, image: val }));
+              }}
               fullWidth
               required
+              helperText={
+                editForm.image && editForm.image.startsWith("data:")
+                  ? "Current: Local image selected"
+                  : "Enter a valid image URL"
+              }
             />
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<ImageIcon />}
+              sx={{ mt: 1, mb: 0, textTransform: "none" }}
+            >
+              {editForm.image && editForm.image.startsWith("data:")
+                ? "Change Image (Local)"
+                : "Upload Local Image"}
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error("Image size should be less than 5MB");
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setEditForm((f) => ({ ...f, image: reader.result }));
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              />
+            </Button>
+            {editForm.image && editForm.image.startsWith("data:") && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.5 }}
+              >
+                Local image selected
+              </Typography>
+            )}
           </DialogContent>
           <DialogActions>
             <Button
