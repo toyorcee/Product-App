@@ -111,7 +111,7 @@ export default function Sidebar({ open, onClose }) {
             </ul>
           </div>
           <button
-            className="w-full mb-20 py-2 !bg-red-600 !hover:bg-red-700 !text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
+            className="w-full mb-20 md:mb-20 py-2 !bg-red-600 !hover:bg-red-700 !text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
             onClick={() => {
               alert("Logged out!");
               onClose && onClose();

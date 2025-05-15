@@ -121,7 +121,7 @@ export default function UserProfile() {
           <EmailIcon className="text-gray-400" /> {user?.email || "..."}
         </p>
       </div>
-      <div className="flex-1 flex flex-col justify-start overflow-y-auto h-full py-12 px-8 md:px-16 lg:px-24">
+      <div className="flex-1 flex flex-col justify-start overflow-y-auto lg:overflow-y-visible h-full py-12 px-8 md:px-16 lg:px-24">
         <h2 className="text-2xl font-bold mb-6">Account Details</h2>
         <div className="mb-4">
           <div className="mb-2">
