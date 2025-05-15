@@ -13,16 +13,26 @@ import Typography from "@mui/material/Typography";
 import Rating from "@mui/material/Rating";
 import ProductModal from "../components/ProductModal";
 import MenuIcon from "@mui/icons-material/Menu";
+import TextField from "@mui/material/TextField";
+import Button from "@mui/material/Button";
+import CardActions from "@mui/material/CardActions";
+import { addProductToCartAsync } from "../slices/cartSlice";
+import { useActivity } from "../hooks/useActivity";
+import { toast } from "react-toastify";
 
 export default function Categories() {
   const dispatch = useDispatch();
+  const { trackCartActivity, trackViewActivity, trackCategoryActivity } =
+    useActivity();
   const { categories, loading } = useSelector((state) => state.categories);
   const { byCategory, loading: productsLoading } = useSelector(
     (state) => state.products
   );
+  const userId = useSelector((state) => state.user.user?.id || 3);
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     dispatch(fetchCategoriesAsync());
@@ -35,7 +45,6 @@ export default function Categories() {
         setSearchParams({ category: "electronics" });
       }
     }
-    // eslint-disable-next-line
   }, [loading, categories]);
 
   const selectedCategory = searchParams.get("category") || categories[0] || "";
@@ -44,18 +53,50 @@ export default function Categories() {
     if (!selectedCategory) return;
     if (!byCategory[selectedCategory]) {
       dispatch(fetchProductsByCategoryAsync(selectedCategory));
+      trackCategoryActivity(selectedCategory);
     }
   }, [selectedCategory, byCategory, dispatch]);
 
   const products = byCategory[selectedCategory] || [];
   const showSkeleton = !products.length && productsLoading;
 
+  // Search filter
+  const filteredProducts = products.filter((p) => {
+    const term = search.toLowerCase();
+    return (
+      p.title.toLowerCase().includes(term) ||
+      p.category.toLowerCase().includes(term) ||
+      p.description.toLowerCase().includes(term)
+    );
+  });
+
+  const handleAddToCart = (product, e) => {
+    e.stopPropagation();
+    dispatch(
+      addProductToCartAsync({ userId, productId: product.id, quantity: 1 })
+    )
+      .unwrap()
+      .then(() => {
+        trackCartActivity("add", product);
+        toast.success("Added to cart!");
+      })
+      .catch(() => toast.error("Failed to add to cart"));
+  };
+
   if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="flex flex-col h-full p-4">
-      <h2 className="text-2xl font-bold mb-4">Categories</h2>
-      {/* Mobile: Side Drawer */}
+      <div className="mb-4 mt-4 w-full flex justify-center lg:justify-end">
+        <TextField
+          label="Search in category"
+          variant="outlined"
+          size="small"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="bg-white w-full max-w-md"
+        />
+      </div>
       <div className="md:hidden mb-4">
         <button
           className="flex items-center gap-2 px-4 py-2 bg-white border rounded shadow"
@@ -103,7 +144,10 @@ export default function Categories() {
           <div className="overflow-x-auto">
             <Tabs
               value={selectedCategory}
-              onChange={(_, value) => setSearchParams({ category: value })}
+              onChange={(_, value) => {
+                setSearchParams({ category: value });
+                trackCategoryActivity(value);
+              }}
               variant="scrollable"
               scrollButtons="auto"
               className="flex-nowrap"
@@ -119,11 +163,14 @@ export default function Categories() {
         <DashboardSkeleton />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-stretch">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <Card
               key={product.id}
               className="flex flex-col justify-between h-full w-full max-w-[250px] mx-auto cursor-pointer"
-              onClick={() => setSelectedProductId(product.id)}
+              onClick={() => {
+                setSelectedProductId(product.id);
+                trackViewActivity(product);
+              }}
             >
               <CardMedia
                 component="img"
@@ -166,6 +213,17 @@ export default function Categories() {
                   ${product.price}
                 </Typography>
               </CardContent>
+              <CardActions className="p-0">
+                <Button
+                  fullWidth
+                  variant="contained"
+                  color="primary"
+                  className="!bg-blue-600 !hover:bg-blue-700 !text-white font-semibold rounded-b-lg"
+                  onClick={(e) => handleAddToCart(product, e)}
+                >
+                  Add to Cart
+                </Button>
+              </CardActions>
             </Card>
           ))}
         </div>

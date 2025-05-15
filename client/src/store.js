@@ -1,18 +1,18 @@
 import { configureStore } from "@reduxjs/toolkit";
-import cartReducer from "./slices/cartSlice";
 import productsReducer from "./slices/productsSlice";
 import categoriesReducer from "./slices/categoriesSlice";
 import userReducer from "./slices/userSlice";
+import cartReducer from "./slices/cartSlice";
 import dashboardReducer from "./slices/dashboardSlice";
+import activityReducer from "./slices/activitySlice";
 
-const store = configureStore({
+export const store = configureStore({
   reducer: {
-    cart: cartReducer,
     products: productsReducer,
     categories: categoriesReducer,
     user: userReducer,
+    cart: cartReducer,
     dashboard: dashboardReducer,
+    activity: activityReducer,
   },
 });
-
-export default store;

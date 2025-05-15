@@ -12,12 +12,17 @@ import Pagination from "@mui/material/Pagination";
 import TextField from "@mui/material/TextField";
 import Rating from "@mui/material/Rating";
 import ProductModal from "../components/ProductModal";
+import { addProductToCartAsync } from "../slices/cartSlice";
+import { useActivity } from "../hooks/useActivity";
+import { toast } from "react-toastify";
 
 const PAGE_SIZE = 9;
 
 export default function Products() {
   const dispatch = useDispatch();
+  const { trackCartActivity, trackViewActivity } = useActivity();
   const { products, loading } = useSelector((state) => state.products);
+  const userId = useSelector((state) => state.user.user?.id || 3);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -39,10 +44,25 @@ export default function Products() {
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const handleAddToCart = (product, e) => {
+    e.stopPropagation();
+    dispatch(
+      addProductToCartAsync({ userId, productId: product.id, quantity: 1 })
+    )
+      .unwrap()
+      .then((res) => {
+        trackCartActivity("add", product);
+        toast.success("Added to cart!");
+      })
+      .catch((err) => {
+        toast.error("Failed to add to cart");
+        console.error("Add to cart error:", err);
+      });
+  };
+
   return (
     <div className="flex flex-col h-full p-4">
-      <h2 className="text-2xl font-bold mb-4">Products</h2>
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div className="mb-4 mt-4 w-full flex justify-center lg:justify-end">
         <TextField
           label="Search products"
           variant="outlined"
@@ -52,8 +72,10 @@ export default function Products() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          className="bg-white"
+          className="bg-white w-full max-w-md"
         />
+      </div>
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <Pagination
           count={pageCount}
           page={page}
@@ -70,7 +92,10 @@ export default function Products() {
               <Card
                 key={product.id}
                 className="flex flex-col justify-between h-full w-full max-w-[250px] mx-auto cursor-pointer"
-                onClick={() => setSelectedProductId(product.id)}
+                onClick={() => {
+                  setSelectedProductId(product.id);
+                  trackViewActivity(product);
+                }}
               >
                 <CardMedia
                   component="img"
@@ -113,6 +138,17 @@ export default function Products() {
                     ${product.price}
                   </Typography>
                 </CardContent>
+                <CardActions className="p-0">
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    className="!bg-blue-600 !hover:bg-blue-700 !text-white font-semibold rounded-b-lg"
+                    onClick={(e) => handleAddToCart(product, e)}
+                  >
+                    Add to Cart
+                  </Button>
+                </CardActions>
               </Card>
             ))}
           </div>

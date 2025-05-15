@@ -83,7 +83,6 @@ export default function UserProfile() {
       const res = await dispatch(
         updateUserAsync({ id: user.id, ...form })
       ).unwrap();
-      console.log("Update response:", res);
       const mergedUser = { ...user, ...res };
       if (!mergedUser.name)
         mergedUser.name = user.name || { firstname: "", lastname: "" };
@@ -106,7 +105,7 @@ export default function UserProfile() {
 
   return (
     <div className="flex flex-col md:flex-row h-full w-full bg-white rounded-lg shadow-lg overflow-hidden p-4">
-      <div className="md:w-1/3 w-full bg-blue-50 flex flex-col items-center justify-start py-12 px-6">
+      <div className="md:w-1/3 w-full bg-blue-50 flex flex-col items-center justify-center py-12 px-6">
         <img
           src={user?.image || "https://randomuser.me/api/portraits/men/32.jpg"}
           alt="Profile"
@@ -122,7 +121,7 @@ export default function UserProfile() {
           <EmailIcon className="text-gray-400" /> {user?.email || "..."}
         </p>
       </div>
-      <div className="flex-1 flex flex-col justify-start py-8 px-8 md:px-16 lg:px-24">
+      <div className="flex-1 flex flex-col justify-start overflow-y-auto h-full py-12 px-8 md:px-16 lg:px-24">
         <h2 className="text-2xl font-bold mb-6">Account Details</h2>
         <div className="mb-4">
           <div className="mb-2">
@@ -160,12 +159,12 @@ export default function UserProfile() {
         </div>
         <div className="flex gap-4 pr-4 md:pr-12 mt-6 pt-2">
           <button
-            className="flex items-center gap-2 px-6 py-3 !bg-blue-600 !hover:bg-blue-700 !text-white font-semibold rounded transition"
+            className="flex items-center gap-2 px-4 py-2 text-sm md:px-6 md:py-3 md:text-base !bg-blue-600 !hover:bg-blue-700 !text-white font-semibold rounded transition"
             onClick={handleEditOpen}
           >
             <EditIcon /> Edit Profile
           </button>
-          <button className="flex items-center gap-2 px-6 py-3 bg-red-50 hover:bg-red-100 text-red-700 font-semibold rounded transition">
+          <button className="flex items-center gap-2 px-4 py-2 text-sm md:px-6 md:py-3 md:text-base bg-red-50 hover:bg-red-100 text-red-700 font-semibold rounded transition">
             <LogoutIcon /> Logout
           </button>
         </div>

@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { fetchDashboardDataAsync } from "../slices/dashboardSlice";
+import { selectCartTotalItems } from "../slices/cartSlice";
+import { fetchUserByIdAsync } from "../slices/userSlice";
 import DashboardSkeleton from "../components/DashboardSkeleton";
+import RecentActivity from "../components/RecentActivity";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 
 export default function MainDashboard() {
   const dispatch = useDispatch();
@@ -12,7 +16,14 @@ export default function MainDashboard() {
   );
   const { categories } = useSelector((state) => state.categories);
   const { user } = useSelector((state) => state.user);
+  const cartTotalItems = useSelector(selectCartTotalItems);
   const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    if (!user) {
+      dispatch(fetchUserByIdAsync(6));
+    }
+  }, [dispatch, user]);
 
   useEffect(() => {
     dispatch(fetchDashboardDataAsync());
@@ -35,11 +46,8 @@ export default function MainDashboard() {
   if (hour >= 12 && hour < 17) greeting = "Good afternoon";
   else if (hour >= 17 || hour < 5) greeting = "Good evening";
 
-  const firstName =
-    user && user.name && user.name.firstname ? user.name.firstname : "User";
-  const lastName =
-    user && user.name && user.name.lastname ? user.name.lastname : "";
-  const fullName = `${firstName} ${lastName}`.trim();
+  const fullName =
+    user && user.name ? `${user.name.firstname} ${user.name.lastname}` : "User";
 
   const dateString = nigeriaTime.toLocaleDateString("en-NG", {
     weekday: "long",
@@ -84,6 +92,15 @@ export default function MainDashboard() {
           </div>
           <div className="text-gray-700 font-semibold">Total Products</div>
         </div>
+        <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center">
+          <div className="text-4xl font-bold text-purple-600 mb-2">
+            {cartTotalItems}
+          </div>
+          <div className="text-gray-700 font-semibold flex items-center gap-2">
+            <ShoppingCartIcon className="text-purple-600" />
+            Cart Items
+          </div>
+        </div>
         {Object.keys(categoryCounts).map((cat) => (
           <div
             key={cat}
@@ -97,6 +114,11 @@ export default function MainDashboard() {
             </div>
           </div>
         ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+        <div className="lg:col-span-3">
+          <RecentActivity />
+        </div>
       </div>
     </div>
   );
