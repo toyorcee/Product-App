@@ -34,6 +34,9 @@ import {
 import ImageIcon from "@mui/icons-material/Image";
 
 const PAGE_SIZE = 9;
+const CLOUDINARY_UPLOAD_URL =
+  "https://api.cloudinary.com/v1_1/dnryzbfqb/image/upload";
+const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset";
 
 export default function Products() {
   const dispatch = useDispatch();
@@ -85,7 +88,13 @@ export default function Products() {
   };
 
   return (
-    <div className="flex flex-col h-full p-4">
+    <div
+      className={
+        openCreate
+          ? "flex flex-col h-full p-4 overflow-hidden"
+          : "flex flex-col h-full p-4"
+      }
+    >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 mt-4 w-full gap-2">
         <TextField
           label="Search products"
@@ -233,6 +242,8 @@ export default function Products() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            overflow: "visible",
+            maxHeight: "100vh",
           },
         }}
         BackdropProps={{
@@ -242,15 +253,29 @@ export default function Products() {
           },
         }}
       >
-        <CreateProductForm />
+        <CreateProductForm onClose={() => setOpenCreate(false)} />
       </Dialog>
       <Dialog
         open={!!editingProduct}
         onClose={() => setEditingProduct(null)}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            background: "none",
+            boxShadow: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          },
+        }}
+        BackdropProps={{
+          style: {
+            background: "rgba(30, 41, 59, 0.35)",
+            backdropFilter: "blur(2px)",
+          },
+        }}
       >
-        <DialogTitle>Edit Product</DialogTitle>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -283,6 +308,14 @@ export default function Products() {
                   `https://fakestoreapi.com/products/${editingProduct.id}`,
                   apiPayload
                 );
+                // Remove any local product with the same id
+                const localProducts = JSON.parse(
+                  localStorage.getItem("localProducts") || "[]"
+                );
+                const filtered = localProducts.filter(
+                  (p) => p.id !== editingProduct.id
+                );
+                localStorage.setItem("localProducts", JSON.stringify(filtered));
                 dispatch(updateProduct(updated));
               }
               trackActivity("update", `Updated product: ${updated.title}`);
@@ -298,20 +331,29 @@ export default function Products() {
           }}
         >
           <DialogContent
-            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              maxHeight: "70vh",
+              overflowY: "auto",
+              minWidth: { xs: 0, sm: 340 },
+            }}
           >
+            {/* Image Preview */}
             {editForm.image && (
               <div style={{ textAlign: "center", marginBottom: 8 }}>
                 <img
                   src={editForm.image}
                   alt={editForm.title || "Product image"}
                   style={{
-                    maxWidth: 120,
-                    maxHeight: 120,
-                    objectFit: "contain",
+                    maxWidth: 80,
+                    maxHeight: 80,
+                    objectFit: "cover",
                     borderRadius: 8,
                     border: "1px solid #eee",
                     background: "#fafafa",
+                    margin: "0 auto",
                   }}
                 />
                 {editForm.image.startsWith("data:") && editForm.imageName && (
@@ -380,7 +422,9 @@ export default function Products() {
               fullWidth
               required
               helperText={
-                editForm.image && editForm.image.startsWith("data:")
+                editingProduct && !editingProduct.isLocal
+                  ? "Only image URLs are allowed for API products."
+                  : editForm.image && editForm.image.startsWith("data:")
                   ? `Current: Local image selected${
                       editForm.imageName ? " (" + editForm.imageName + ")" : ""
                     }`
@@ -392,6 +436,9 @@ export default function Products() {
               component="label"
               startIcon={<ImageIcon />}
               sx={{ mt: 1, mb: 0, textTransform: "none" }}
+              disabled={
+                editLoading || (editingProduct && !editingProduct.isLocal)
+              }
             >
               {editForm.image && editForm.image.startsWith("data:")
                 ? "Change Image (Local)"
@@ -407,15 +454,31 @@ export default function Products() {
                       toast.error("Image size should be less than 5MB");
                       return;
                     }
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setEditForm((f) => ({
-                        ...f,
-                        image: reader.result,
-                        imageName: file.name,
-                      }));
-                    };
-                    reader.readAsDataURL(file);
+                    setEditLoading(true);
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+                    try {
+                      const res = await fetch(CLOUDINARY_UPLOAD_URL, {
+                        method: "POST",
+                        body: formData,
+                      });
+                      const data = await res.json();
+                      if (data.secure_url) {
+                        setEditForm((f) => ({
+                          ...f,
+                          image: data.secure_url,
+                          imageName: file.name,
+                        }));
+                        toast.success("Image uploaded!");
+                      } else {
+                        toast.error("Image upload failed.");
+                      }
+                    } catch (err) {
+                      toast.error("Image upload error.");
+                    } finally {
+                      setEditLoading(false);
+                    }
                   }
                 }}
               />
@@ -459,6 +522,17 @@ export default function Products() {
                 } else {
                   await axios.delete(
                     `https://fakestoreapi.com/products/${deletingProduct.id}`
+                  );
+                  // Remove any local product with the same id
+                  const localProducts = JSON.parse(
+                    localStorage.getItem("localProducts") || "[]"
+                  );
+                  const filtered = localProducts.filter(
+                    (p) => p.id !== deletingProduct.id
+                  );
+                  localStorage.setItem(
+                    "localProducts",
+                    JSON.stringify(filtered)
                   );
                   dispatch(deleteProduct(deletingProduct.id));
                 }

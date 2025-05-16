@@ -92,6 +92,16 @@ export default function Categories() {
     );
   });
 
+  // Debug logs for category rendering
+  console.log("Products in Redux byCategory:", byCategory);
+  console.log(
+    "Products rendered for category",
+    selectedCategory,
+    ":",
+    products
+  );
+  console.log("Filtered products rendered:", filteredProducts);
+
   const handleAddToCart = (product, e) => {
     e.stopPropagation();
     dispatch(
@@ -376,22 +386,56 @@ export default function Categories() {
               fullWidth
               required
             />
+            {/* Image Preview */}
+            {editForm.image && (
+              <div style={{ textAlign: "center", marginBottom: 8 }}>
+                <img
+                  src={editForm.image}
+                  alt={editForm.title || "Product image"}
+                  style={{
+                    maxWidth: 120,
+                    maxHeight: 120,
+                    objectFit: "contain",
+                    borderRadius: 8,
+                    border: "1px solid #eee",
+                    background: "#fafafa",
+                  }}
+                />
+                {editForm.image.startsWith("data:") && editForm.imageName && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 0.5, display: "block" }}
+                  >
+                    {editForm.imageName}
+                  </Typography>
+                )}
+              </div>
+            )}
             <TextField
-              label="Image URL"
+              label="Image URL or Name *"
               value={
-                editForm.image && !editForm.image.startsWith("data:")
-                  ? editForm.image
-                  : ""
+                editForm.image && editForm.image.startsWith("data:")
+                  ? editForm.imageName || ""
+                  : editForm.image || ""
               }
               onChange={(e) => {
                 const val = e.target.value;
-                setEditForm((f) => ({ ...f, image: val }));
+                if (editForm.image && editForm.image.startsWith("data:")) {
+                  setEditForm((f) => ({ ...f, imageName: val }));
+                } else {
+                  setEditForm((f) => ({ ...f, image: val }));
+                }
               }}
               fullWidth
               required
               helperText={
-                editForm.image && editForm.image.startsWith("data:")
-                  ? "Current: Local image selected"
+                editingProduct && !editingProduct.isLocal
+                  ? "Only image URLs are allowed for API products."
+                  : editForm.image && editForm.image.startsWith("data:")
+                  ? `Current: Local image selected${
+                      editForm.imageName ? " (" + editForm.imageName + ")" : ""
+                    }`
                   : "Enter a valid image URL"
               }
             />
@@ -400,6 +444,7 @@ export default function Categories() {
               component="label"
               startIcon={<ImageIcon />}
               sx={{ mt: 1, mb: 0, textTransform: "none" }}
+              disabled={editingProduct && !editingProduct.isLocal}
             >
               {editForm.image && editForm.image.startsWith("data:")
                 ? "Change Image (Local)"
@@ -417,22 +462,17 @@ export default function Categories() {
                     }
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                      setEditForm((f) => ({ ...f, image: reader.result }));
+                      setEditForm((f) => ({
+                        ...f,
+                        image: reader.result,
+                        imageName: file.name,
+                      }));
                     };
                     reader.readAsDataURL(file);
                   }
                 }}
               />
             </Button>
-            {editForm.image && editForm.image.startsWith("data:") && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 0.5 }}
-              >
-                Local image selected
-              </Typography>
-            )}
           </DialogContent>
           <DialogActions>
             <Button
