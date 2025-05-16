@@ -17,24 +17,42 @@ export function saveLocalProduct(product) {
 
 function groupByCategory(products) {
   const byCategory = {};
-  for (const product of products) {
-    if (!byCategory[product.category]) {
-      byCategory[product.category] = [];
+
+  // First, get all unique categories
+  const allCategories = Array.from(
+    new Set(products.map((p) => p.category.trim()))
+  );
+
+  // Initialize empty arrays for each category
+  allCategories.forEach((cat) => {
+    byCategory[cat] = [];
+  });
+
+  // Group products by their exact category
+  products.forEach((product) => {
+    const category = product.category.trim();
+    if (byCategory[category]) {
+      byCategory[category].push(product);
     }
-    byCategory[product.category].push(product);
-  }
+  });
+
   return byCategory;
 }
 
 export const fetchProductsAsync = createAsyncThunk(
   "products/fetchProducts",
   async (_, { getState }) => {
-    const { products } = getState().products;
-    if (products.length > 0) return products;
     const res = await fetchProducts();
     const apiProducts = res.data;
-    const localProducts = getLocalProducts();
-    return [...apiProducts, ...localProducts];
+    const localProducts = JSON.parse(
+      localStorage.getItem("localProducts") || "[]"
+    );
+
+    // Merge products and sort by ID
+    const merged = [...apiProducts, ...localProducts].sort(
+      (a, b) => b.id - a.id
+    );
+    return merged;
   }
 );
 
@@ -71,9 +89,15 @@ export function updateLocalProduct(updatedProduct) {
 }
 
 export function deleteLocalProduct(id) {
-  let localProducts = JSON.parse(localStorage.getItem("localProducts") || "[]");
-  localProducts = localProducts.filter((p) => p.id !== id);
-  localStorage.setItem("localProducts", JSON.stringify(localProducts));
+  try {
+    const localProducts = JSON.parse(
+      localStorage.getItem("localProducts") || "[]"
+    );
+    const filteredProducts = localProducts.filter((p) => p.id !== id);
+    localStorage.setItem("localProducts", JSON.stringify(filteredProducts));
+  } catch (error) {
+    console.error("Error deleting local product:", error);
+  }
 }
 
 const productsSlice = createSlice({
@@ -81,36 +105,71 @@ const productsSlice = createSlice({
   initialState: { products: [], byCategory: {}, byId: {}, loading: false },
   reducers: {
     addProduct: (state, action) => {
+      // Add to products array
       state.products.push(action.payload);
-      const cat = action.payload.category;
-      if (!state.byCategory[cat]) {
-        state.byCategory[cat] = [];
+
+      // Update byCategory
+      const category = action.payload.category.trim();
+      if (!state.byCategory[category]) {
+        state.byCategory[category] = [];
       }
-      state.byCategory[cat].push(action.payload);
+      state.byCategory[category].push(action.payload);
+
+      // Update byId
+      state.byId[action.payload.id] = action.payload;
     },
     updateProduct: (state, action) => {
-      const idx = state.products.findIndex((p) => p.id === action.payload.id);
-      if (idx !== -1) {
-        state.products[idx] = action.payload;
+      const updatedProduct = action.payload;
+      const oldProduct = state.byId[updatedProduct.id];
+
+      // Update in products array
+      const productIndex = state.products.findIndex(
+        (p) => p.id === updatedProduct.id
+      );
+      if (productIndex !== -1) {
+        state.products[productIndex] = updatedProduct;
       }
-      // Update byCategory as well
-      const cat = action.payload.category;
-      if (state.byCategory[cat]) {
-        const catIdx = state.byCategory[cat].findIndex(
-          (p) => p.id === action.payload.id
-        );
-        if (catIdx !== -1) {
-          state.byCategory[cat][catIdx] = action.payload;
+
+      // Update in byCategory
+      if (oldProduct) {
+        // Remove from old category
+        const oldCategory = oldProduct.category.trim();
+        if (state.byCategory[oldCategory]) {
+          state.byCategory[oldCategory] = state.byCategory[oldCategory].filter(
+            (p) => p.id !== updatedProduct.id
+          );
         }
       }
+
+      // Add to new category
+      const newCategory = updatedProduct.category.trim();
+      if (!state.byCategory[newCategory]) {
+        state.byCategory[newCategory] = [];
+      }
+      state.byCategory[newCategory].push(updatedProduct);
+
+      // Update byId
+      state.byId[updatedProduct.id] = updatedProduct;
     },
     deleteProduct: (state, action) => {
-      state.products = state.products.filter((p) => p.id !== action.payload);
-      for (const cat in state.byCategory) {
-        state.byCategory[cat] = state.byCategory[cat].filter(
-          (p) => p.id !== action.payload
-        );
+      const productId = action.payload;
+      const product = state.byId[productId];
+
+      // Remove from products array
+      state.products = state.products.filter((p) => p.id !== productId);
+
+      // Remove from category
+      if (product) {
+        const category = product.category.trim();
+        if (state.byCategory[category]) {
+          state.byCategory[category] = state.byCategory[category].filter(
+            (p) => p.id !== productId
+          );
+        }
       }
+
+      // Remove from byId
+      delete state.byId[productId];
     },
   },
   extraReducers: (builder) => {
@@ -119,7 +178,6 @@ const productsSlice = createSlice({
         state.loading = true;
       })
       .addCase(fetchProductsAsync.fulfilled, (state, action) => {
-        console.log("fetchProductsAsync fulfilled, payload:", action.payload);
         state.products = action.payload;
         state.byCategory = groupByCategory(action.payload);
         state.loading = false;

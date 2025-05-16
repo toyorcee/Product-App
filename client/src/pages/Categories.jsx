@@ -35,6 +35,11 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import axios from "axios";
 import ImageIcon from "@mui/icons-material/Image";
+import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Divider from "@mui/material/Divider";
 
 export default function Categories() {
   const dispatch = useDispatch();
@@ -54,6 +59,8 @@ export default function Categories() {
   const [deletingProduct, setDeletingProduct] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
+  const [openCreateCategory, setOpenCreateCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
 
   useEffect(() => {
     dispatch(fetchCategoriesAsync());
@@ -92,16 +99,6 @@ export default function Categories() {
     );
   });
 
-  // Debug logs for category rendering
-  console.log("Products in Redux byCategory:", byCategory);
-  console.log(
-    "Products rendered for category",
-    selectedCategory,
-    ":",
-    products
-  );
-  console.log("Filtered products rendered:", filteredProducts);
-
   const handleAddToCart = (product, e) => {
     e.stopPropagation();
     dispatch(
@@ -119,7 +116,18 @@ export default function Categories() {
 
   return (
     <div className="flex flex-col h-full p-4">
-      <div className="mb-4 mt-4 w-full flex justify-center lg:justify-end">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 mt-4 w-full">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            className="!bg-blue-600 !hover:bg-blue-700 !text-white font-semibold rounded-lg"
+            onClick={() => setOpenCreateCategory(true)}
+          >
+            Create Category
+          </Button>
+        </div>
         <TextField
           label="Search in category"
           variant="outlined"
@@ -525,6 +533,155 @@ export default function Categories() {
             Delete
           </Button>
         </DialogActions>
+      </Dialog>
+      <Dialog
+        open={openCreateCategory}
+        onClose={() => {
+          setOpenCreateCategory(false);
+          setNewCategory("");
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: "none",
+            boxShadow: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "visible",
+            maxHeight: "100vh",
+          },
+        }}
+        BackdropProps={{
+          style: {
+            background: "rgba(30, 41, 59, 0.35)",
+            backdropFilter: "blur(2px)",
+          },
+        }}
+      >
+        <Box
+          sx={{
+            background: "#f0f6ff",
+            borderRadius: 3,
+            border: "1.5px solid #e3edfa",
+            p: { xs: 3, sm: 4 },
+            boxShadow: 4,
+            maxWidth: 400,
+            mx: "auto",
+            my: 2,
+            minWidth: { xs: 0, sm: 340 },
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "visible",
+            position: "relative",
+          }}
+        >
+          <IconButton
+            aria-label="close"
+            onClick={() => {
+              setOpenCreateCategory(false);
+              setNewCategory("");
+            }}
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              zIndex: 10,
+              color: "#2563eb",
+              background: "none",
+              p: 0.5,
+            }}
+          >
+            <CloseIcon fontSize="small" sx={{ color: "#2563eb" }} />
+          </IconButton>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              mb: 2,
+            }}
+          >
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                background:
+                  "linear-gradient(135deg, #2563eb 60%, #60a5fa 100%)",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 1,
+              }}
+            >
+              <AddIcon sx={{ color: "white", fontSize: 28 }} />
+            </Box>
+            <Typography
+              variant="h5"
+              fontWeight={700}
+              color="primary.main"
+              align="center"
+              sx={{ mb: 0.5, letterSpacing: 0.5 }}
+            >
+              Create New Category
+            </Typography>
+            <Divider
+              sx={{
+                width: 60,
+                height: 3,
+                bgcolor: "primary.main",
+                borderRadius: 2,
+                mt: 1,
+                mb: 0.5,
+              }}
+            />
+          </Box>
+          <Box sx={{ width: "100%" }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newCategory.trim()) {
+                  toast.success("Category created successfully!");
+                  setOpenCreateCategory(false);
+                  setNewCategory("");
+                }
+              }}
+            >
+              <Stack spacing={2}>
+                <TextField
+                  label="Category Name"
+                  fullWidth
+                  size="small"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  required
+                  autoFocus
+                />
+                <Button
+                  type="submit"
+                  fullWidth
+                  size="large"
+                  sx={{
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    py: 1.2,
+                    mt: 1,
+                    background: "#2563eb",
+                    color: "#fff !important",
+                    cursor: "pointer",
+                    "&:hover": { background: "#1e40af" },
+                  }}
+                >
+                  Create Category
+                </Button>
+              </Stack>
+            </form>
+          </Box>
+        </Box>
       </Dialog>
     </div>
   );

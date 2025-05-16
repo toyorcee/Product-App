@@ -28,6 +28,7 @@ import {
   selectCartTotalItems,
 } from "../slices/cartSlice";
 import { fetchProductsAsync } from "../slices/productsSlice";
+import { toast } from "react-toastify";
 
 const PAGE_SIZE = 6;
 
@@ -43,6 +44,7 @@ export default function Carts() {
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
     itemId: null,
+    type: null,
   });
 
   useEffect(() => {
@@ -57,18 +59,26 @@ export default function Carts() {
   const paginated = cartItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleRemove = (itemId) => {
-    setConfirmDialog({ open: true, itemId });
+    setConfirmDialog({ open: true, itemId, type: "remove" });
   };
 
-  const handleConfirmRemove = () => {
+  const handleBuy = (itemId) => {
+    setConfirmDialog({ open: true, itemId, type: "buy" });
+  };
+
+  const handleConfirmAction = () => {
     if (confirmDialog.itemId !== null) {
-      dispatch(removeFromCart(confirmDialog.itemId));
+      if (confirmDialog.type === "remove") {
+        dispatch(removeFromCart(confirmDialog.itemId));
+      } else if (confirmDialog.type === "buy") {
+        toast.success("Purchase successful!");
+      }
     }
-    setConfirmDialog({ open: false, itemId: null });
+    setConfirmDialog({ open: false, itemId: null, type: null });
   };
 
-  const handleCancelRemove = () => {
-    setConfirmDialog({ open: false, itemId: null });
+  const handleCancelAction = () => {
+    setConfirmDialog({ open: false, itemId: null, type: null });
   };
 
   return (
@@ -111,6 +121,24 @@ export default function Carts() {
                   className="flex flex-col justify-between h-full w-[260px] min-w-[260px] max-w-xs mx-auto shadow-md rounded-xl cursor-pointer bg-white"
                   onClick={() => setSelectedProductId(product.id)}
                 >
+                  <Button
+                    variant="contained"
+                    size="small"
+                    fullWidth
+                    className="!bg-red-600 hover:!bg-red-700 !text-white font-semibold rounded-t-xl"
+                    style={{
+                      borderRadius: 0,
+                      borderTopLeftRadius: 12,
+                      borderTopRightRadius: 12,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemove(item.id);
+                    }}
+                    startIcon={<DeleteIcon />}
+                  >
+                    Remove from Cart
+                  </Button>
                   <CardMedia
                     component="img"
                     style={{ height: 160, objectFit: "contain" }}
@@ -128,22 +156,6 @@ export default function Carts() {
                       >
                         {product.title}
                       </Typography>
-                      <Tooltip title="Remove from cart" arrow>
-                        <IconButton
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemove(item.id);
-                          }}
-                          className="!bg-red-50 hover:!bg-red-100"
-                          aria-label="Remove from cart"
-                        >
-                          <DeleteIcon
-                            className="text-red-500"
-                            fontSize="small"
-                          />
-                        </IconButton>
-                      </Tooltip>
                     </div>
                     <Typography variant="body2" color="text.secondary">
                       {product.category}
@@ -210,6 +222,10 @@ export default function Carts() {
                       borderBottomLeftRadius: 12,
                       borderBottomRightRadius: 12,
                     }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleBuy(item.id);
+                    }}
                   >
                     Buy Now
                   </Button>
@@ -227,23 +243,29 @@ export default function Carts() {
               />
             </Box>
           )}
-          <Dialog open={confirmDialog.open} onClose={handleCancelRemove}>
-            <DialogTitle>Remove from Cart</DialogTitle>
+          <Dialog open={confirmDialog.open} onClose={handleCancelAction}>
+            <DialogTitle>
+              {confirmDialog.type === "buy"
+                ? "Confirm Purchase"
+                : "Remove from Cart"}
+            </DialogTitle>
             <DialogContent>
               <Typography>
-                Are you sure you want to remove this product from your cart?
+                {confirmDialog.type === "buy"
+                  ? "Are you sure you want to purchase this item?"
+                  : "Are you sure you want to remove this product from your cart?"}
               </Typography>
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleCancelRemove} color="primary">
+              <Button onClick={handleCancelAction} color="primary">
                 Cancel
               </Button>
               <Button
-                onClick={handleConfirmRemove}
-                color="error"
+                onClick={handleConfirmAction}
+                color={confirmDialog.type === "buy" ? "success" : "error"}
                 variant="contained"
               >
-                Remove
+                {confirmDialog.type === "buy" ? "Buy Now" : "Remove"}
               </Button>
             </DialogActions>
           </Dialog>

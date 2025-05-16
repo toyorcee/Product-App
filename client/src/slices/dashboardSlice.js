@@ -12,14 +12,20 @@ export const fetchDashboardDataAsync = createAsyncThunk(
     const categories = categoriesRes.data;
 
     const productsRes = await fetchProducts();
-    const allProducts = productsRes.data;
+    const apiProducts = productsRes.data;
+    const localProducts = JSON.parse(
+      localStorage.getItem("localProducts") || "[]"
+    );
+    const allProducts = [...apiProducts, ...localProducts];
+
     const totalProducts = allProducts.length;
 
     const categoryCounts = {};
     await Promise.all(
       categories.map(async (cat) => {
-        const res = await fetchProductsByCategory(cat);
-        categoryCounts[cat] = res.data.length;
+        categoryCounts[cat] = allProducts.filter(
+          (p) => p.category === cat
+        ).length;
       })
     );
 

@@ -31,7 +31,7 @@ import {
   updateProduct,
   deleteProduct,
 } from "../slices/productsSlice";
-import ImageIcon from "@mui/icons-material/Image";
+import EditProductForm from "../components/EditProductForm";
 
 const PAGE_SIZE = 9;
 const CLOUDINARY_UPLOAD_URL =
@@ -70,6 +70,8 @@ export default function Products() {
 
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const mensProducts = products.filter((p) => p.category === "men's clothing");
 
   const handleAddToCart = (product, e) => {
     e.stopPropagation();
@@ -192,7 +194,6 @@ export default function Products() {
                         e.stopPropagation();
                         setEditForm(product);
                         setEditingProduct(product);
-                        console.log("Editing product:", product);
                       }}
                       aria-label="edit"
                     >
@@ -232,7 +233,7 @@ export default function Products() {
       )}
       <Dialog
         open={openCreate}
-        onClose={() => setOpenCreate(false)}
+        onClose={() => !loading && setOpenCreate(false)}
         maxWidth="sm"
         fullWidth
         PaperProps={{
@@ -257,7 +258,7 @@ export default function Products() {
       </Dialog>
       <Dialog
         open={!!editingProduct}
-        onClose={() => setEditingProduct(null)}
+        onClose={() => !editLoading && setEditingProduct(null)}
         maxWidth="sm"
         fullWidth
         PaperProps={{
@@ -267,6 +268,8 @@ export default function Products() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            overflow: "visible",
+            maxHeight: "100vh",
           },
         }}
         BackdropProps={{
@@ -276,231 +279,12 @@ export default function Products() {
           },
         }}
       >
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setEditLoading(true);
-            try {
-              let updated = { ...editForm };
-              if (!updated.image || updated.image === "") {
-                toast.error("Image is required");
-                setEditLoading(false);
-                return;
-              }
-              if (editingProduct.isLocal) {
-                updateLocalProduct(updated);
-                dispatch(updateProduct(updated));
-              } else {
-                if (updated.image.startsWith("data:")) {
-                  toast.error("API products require a valid image URL");
-                  setEditLoading(false);
-                  return;
-                }
-                const apiPayload = {
-                  id: editingProduct.id,
-                  title: updated.title,
-                  price: parseFloat(updated.price),
-                  description: updated.description,
-                  category: updated.category,
-                  image: updated.image,
-                };
-                await axios.put(
-                  `https://fakestoreapi.com/products/${editingProduct.id}`,
-                  apiPayload
-                );
-                // Remove any local product with the same id
-                const localProducts = JSON.parse(
-                  localStorage.getItem("localProducts") || "[]"
-                );
-                const filtered = localProducts.filter(
-                  (p) => p.id !== editingProduct.id
-                );
-                localStorage.setItem("localProducts", JSON.stringify(filtered));
-                dispatch(updateProduct(updated));
-              }
-              trackActivity("update", `Updated product: ${updated.title}`);
-              toast.success("Product updated!");
-              dispatch(fetchProductsAsync());
-              setEditingProduct(null);
-            } catch (err) {
-              toast.error("Failed to update product");
-              console.error("Update error:", err);
-            } finally {
-              setEditLoading(false);
-            }
-          }}
-        >
-          <DialogContent
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-              maxHeight: "70vh",
-              overflowY: "auto",
-              minWidth: { xs: 0, sm: 340 },
-            }}
-          >
-            {/* Image Preview */}
-            {editForm.image && (
-              <div style={{ textAlign: "center", marginBottom: 8 }}>
-                <img
-                  src={editForm.image}
-                  alt={editForm.title || "Product image"}
-                  style={{
-                    maxWidth: 80,
-                    maxHeight: 80,
-                    objectFit: "cover",
-                    borderRadius: 8,
-                    border: "1px solid #eee",
-                    background: "#fafafa",
-                    margin: "0 auto",
-                  }}
-                />
-                {editForm.image.startsWith("data:") && editForm.imageName && (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 0.5, display: "block" }}
-                  >
-                    {editForm.imageName}
-                  </Typography>
-                )}
-              </div>
-            )}
-            <TextField
-              label="Title *"
-              value={editForm.title || ""}
-              onChange={(e) =>
-                setEditForm((f) => ({ ...f, title: e.target.value }))
-              }
-              fullWidth
-              required
-            />
-            <TextField
-              label="Price *"
-              type="number"
-              value={editForm.price || ""}
-              onChange={(e) =>
-                setEditForm((f) => ({ ...f, price: e.target.value }))
-              }
-              fullWidth
-              required
-            />
-            <TextField
-              label="Description *"
-              value={editForm.description || ""}
-              onChange={(e) =>
-                setEditForm((f) => ({ ...f, description: e.target.value }))
-              }
-              fullWidth
-              required
-            />
-            <TextField
-              label="Category *"
-              value={editForm.category || ""}
-              onChange={(e) =>
-                setEditForm((f) => ({ ...f, category: e.target.value }))
-              }
-              fullWidth
-              required
-            />
-            <TextField
-              label="Image URL or Name *"
-              value={
-                editForm.image && editForm.image.startsWith("data:")
-                  ? editForm.imageName || ""
-                  : editForm.image || ""
-              }
-              onChange={(e) => {
-                const val = e.target.value;
-                if (editForm.image && editForm.image.startsWith("data:")) {
-                  setEditForm((f) => ({ ...f, imageName: val }));
-                } else {
-                  setEditForm((f) => ({ ...f, image: val }));
-                }
-              }}
-              fullWidth
-              required
-              helperText={
-                editingProduct && !editingProduct.isLocal
-                  ? "Only image URLs are allowed for API products."
-                  : editForm.image && editForm.image.startsWith("data:")
-                  ? `Current: Local image selected${
-                      editForm.imageName ? " (" + editForm.imageName + ")" : ""
-                    }`
-                  : "Enter a valid image URL"
-              }
-            />
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<ImageIcon />}
-              sx={{ mt: 1, mb: 0, textTransform: "none" }}
-              disabled={
-                editLoading || (editingProduct && !editingProduct.isLocal)
-              }
-            >
-              {editForm.image && editForm.image.startsWith("data:")
-                ? "Change Image (Local)"
-                : "Upload Local Image"}
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={async (e) => {
-                  const file = e.target.files[0];
-                  if (file) {
-                    if (file.size > 5 * 1024 * 1024) {
-                      toast.error("Image size should be less than 5MB");
-                      return;
-                    }
-                    setEditLoading(true);
-                    const formData = new FormData();
-                    formData.append("file", file);
-                    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-                    try {
-                      const res = await fetch(CLOUDINARY_UPLOAD_URL, {
-                        method: "POST",
-                        body: formData,
-                      });
-                      const data = await res.json();
-                      if (data.secure_url) {
-                        setEditForm((f) => ({
-                          ...f,
-                          image: data.secure_url,
-                          imageName: file.name,
-                        }));
-                        toast.success("Image uploaded!");
-                      } else {
-                        toast.error("Image upload failed.");
-                      }
-                    } catch (err) {
-                      toast.error("Image upload error.");
-                    } finally {
-                      setEditLoading(false);
-                    }
-                  }
-                }}
-              />
-            </Button>
-          </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={() => setEditingProduct(null)}
-              disabled={editLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={editLoading}
-            >
-              {editLoading ? "Saving..." : "Save"}
-            </Button>
-          </DialogActions>
-        </form>
+        {editingProduct && (
+          <EditProductForm
+            product={editingProduct}
+            onClose={() => setEditingProduct(null)}
+          />
+        )}
       </Dialog>
       <Dialog open={!!deletingProduct} onClose={() => setDeletingProduct(null)}>
         <DialogTitle>Delete Product</DialogTitle>
@@ -523,7 +307,6 @@ export default function Products() {
                   await axios.delete(
                     `https://fakestoreapi.com/products/${deletingProduct.id}`
                   );
-                  // Remove any local product with the same id
                   const localProducts = JSON.parse(
                     localStorage.getItem("localProducts") || "[]"
                   );

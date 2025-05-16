@@ -1,59 +1,58 @@
 import { useForm } from "react-hook-form";
-import axios from "axios";
 import { useState, useEffect } from "react";
 import {
   TextField,
   Button,
-  MenuItem,
-  Select,
-  InputLabel,
-  FormControl,
   Stack,
   Divider,
   Box,
   Typography,
   CircularProgress,
+  IconButton,
 } from "@mui/material";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchProductsAsync,
-  addProduct,
-  saveLocalProduct,
+  updateProduct,
+  updateLocalProduct,
 } from "../slices/productsSlice";
-import { fetchCategoriesAsync, addCategory } from "../slices/categoriesSlice";
 import { useActivity } from "../hooks/useActivity";
 import ImageIcon from "@mui/icons-material/Image";
-import { store } from "../store";
-import { fetchDashboardDataAsync } from "../slices/dashboardSlice";
 import CloseIcon from "@mui/icons-material/Close";
-import IconButton from "@mui/material/IconButton";
+import { fetchDashboardDataAsync } from "../slices/dashboardSlice";
 
-export default function CreateProductForm({ onClose }) {
+const CLOUDINARY_UPLOAD_URL =
+  "https://api.cloudinary.com/v1_1/dnryzbfqb/image/upload";
+const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset";
+
+export default function EditProductForm({ product, onClose }) {
   const dispatch = useDispatch();
   const { trackActivity } = useActivity();
-  const categories = useSelector((state) => state.categories.categories);
-  const categoriesLoading = useSelector((state) => state.categories.loading);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-
-  useEffect(() => {
-    if (!categories || categories.length === 0) {
-      dispatch(fetchCategoriesAsync());
-    }
-  }, [dispatch, categories]);
+  const [selectedImage, setSelectedImage] = useState(product.image);
+  const [imagePreview, setImagePreview] = useState(product.image);
+  const [loading, setLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
-    reset,
     formState: { errors },
-  } = useForm();
-  const [loading, setLoading] = useState(false);
+    setValue,
+  } = useForm({
+    defaultValues: {
+      title: product.title,
+      price: product.price,
+      description: product.description,
+      category: product.category,
+    },
+  });
 
-  const CLOUDINARY_UPLOAD_URL =
-    "https://api.cloudinary.com/v1_1/dnryzbfqb/image/upload";
-  const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset";
+  useEffect(() => {
+    setValue("title", product.title);
+    setValue("price", product.price);
+    setValue("description", product.description);
+    setValue("category", product.category);
+  }, [product, setValue]);
 
   const handleImageChange = async (event) => {
     const file = event.target.files[0];
@@ -96,56 +95,51 @@ export default function CreateProductForm({ onClose }) {
         return;
       }
 
-      const state = store.getState();
-      const allProducts = state.products.products;
-      const localProducts = JSON.parse(
-        localStorage.getItem("localProducts") || "[]"
-      );
-
-      const maxId = Math.max(
-        ...allProducts.map((p) => p.id),
-        ...localProducts.map((p) => p.id),
-        0
-      );
-
-      const newProduct = {
-        id: maxId + 1,
+      const updatedProduct = {
+        ...product,
         title: data.title,
         price: parseFloat(data.price),
         description: data.description,
         category: data.category,
         image: selectedImage,
-        isLocal: true,
       };
 
-      const updatedLocalProducts = [...localProducts, newProduct];
-      localStorage.setItem(
-        "localProducts",
-        JSON.stringify(updatedLocalProducts)
-      );
-
-      dispatch(addProduct(newProduct));
-      trackActivity("create", `Created product: ${newProduct.title}`);
-      toast.success(`Product created successfully! ID: ${newProduct.id}`);
-
-      reset();
-      setSelectedImage(null);
-      setImagePreview(null);
-
-      if (!categories.includes(newProduct.category)) {
-        dispatch(addCategory(newProduct.category));
+      if (product.isLocal) {
+        updateLocalProduct(updatedProduct);
+        dispatch(updateProduct(updatedProduct));
+      } else {
+        if (selectedImage.startsWith("data:")) {
+          toast.error("API products require a valid image URL");
+          setLoading(false);
+          return;
+        }
+        const apiPayload = {
+          id: product.id,
+          title: data.title,
+          price: parseFloat(data.price),
+          description: data.description,
+          category: data.category,
+          image: selectedImage,
+        };
+        await axios.put(
+          `https://fakestoreapi.com/products/${product.id}`,
+          apiPayload
+        );
+        dispatch(updateProduct(updatedProduct));
       }
+
+      trackActivity("update", `Updated product: ${updatedProduct.title}`);
+      toast.success("Product updated successfully!");
 
       await Promise.all([
         dispatch(fetchProductsAsync()),
-        dispatch(fetchCategoriesAsync()),
         dispatch(fetchDashboardDataAsync()),
       ]);
 
       onClose();
     } catch (err) {
-      toast.error("Error creating product");
-      console.error("Product creation error:", err);
+      toast.error("Error updating product");
+      console.error("Product update error:", err);
     } finally {
       setLoading(false);
     }
@@ -209,10 +203,9 @@ export default function CreateProductForm({ onClose }) {
         >
           <svg width="28" height="28" fill="white" viewBox="0 0 24 24">
             <path
-              d="M12 5v14m-7-7h14"
+              d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
               stroke="white"
-              strokeWidth="2.2"
-              strokeLinecap="round"
+              strokeWidth="0.5"
             />
           </svg>
         </Box>
@@ -223,7 +216,7 @@ export default function CreateProductForm({ onClose }) {
           align="center"
           sx={{ mb: 0.5, letterSpacing: 0.5 }}
         >
-          Create Product
+          Edit Product
         </Typography>
         <Divider
           sx={{
@@ -279,28 +272,14 @@ export default function CreateProductForm({ onClose }) {
               error={!!errors.description}
               helperText={errors.description?.message}
             />
-            <FormControl fullWidth error={!!errors.category} size="small">
-              <InputLabel id="category-label">Category</InputLabel>
-              <Select
-                labelId="category-label"
-                label="Category"
-                defaultValue=""
-                {...register("category", { required: "Category is required" })}
-                disabled={categoriesLoading}
-              >
-                {categories &&
-                  categories.map((cat, idx) => (
-                    <MenuItem value={cat} key={idx}>
-                      {cat}
-                    </MenuItem>
-                  ))}
-              </Select>
-              {errors.category && (
-                <Typography color="error" variant="caption">
-                  {errors.category.message}
-                </Typography>
-              )}
-            </FormControl>
+            <TextField
+              label="Category"
+              fullWidth
+              size="small"
+              {...register("category", { required: "Category is required" })}
+              error={!!errors.category}
+              helperText={errors.category?.message}
+            />
             <Box sx={{ width: "100%", mt: 1 }}>
               <input
                 accept="image/*"
@@ -316,8 +295,9 @@ export default function CreateProductForm({ onClose }) {
                   startIcon={<ImageIcon />}
                   fullWidth
                   sx={{ mb: 1 }}
+                  disabled={!product.isLocal}
                 >
-                  Upload Product Image
+                  {product.isLocal ? "Change Product Image" : "Image URL Only"}
                 </Button>
               </label>
               {imagePreview && (
@@ -356,7 +336,7 @@ export default function CreateProductForm({ onClose }) {
                 loading ? <CircularProgress size={20} color="inherit" /> : null
               }
             >
-              {loading ? "Creating..." : "Create Product"}
+              {loading ? "Saving..." : "Save Changes"}
             </Button>
           </Stack>
         </form>
