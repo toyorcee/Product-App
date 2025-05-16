@@ -5,6 +5,7 @@ import Rating from "@mui/material/Rating";
 import CategoryIcon from "@mui/icons-material/Category";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import CloseIcon from "@mui/icons-material/Close";
 import { useDispatch as useReduxDispatch } from "react-redux";
 import { addToCart } from "../slices/cartSlice";
 import { toast } from "react-toastify";
@@ -54,44 +55,35 @@ export default function ProductModal({ id, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(255,255,255,0.85)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+      style={{ background: "rgba(0, 0, 0, 0.5)" }}
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-0 relative flex flex-col md:flex-row overflow-hidden max-h-screen overflow-y-auto"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl relative flex flex-col md:flex-row overflow-hidden max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-3xl z-10 p-0 m-0 bg-transparent border-none rounded-none shadow-none w-auto h-auto"
-          style={{
-            background: "none",
-            border: "none",
-            borderRadius: 0,
-            boxShadow: "none",
-            width: "auto",
-            height: "auto",
-            padding: 0,
-            margin: 0,
-          }}
+          className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/80 hover:bg-white shadow-md transition-all duration-200 hover:scale-110"
+          aria-label="Close modal"
         >
-          &times;
+          <CloseIcon className="text-gray-600 hover:text-red-500 text-2xl" />
         </button>
         {showSkeleton ? (
           <ProductModalSkeleton />
         ) : product ? (
           <>
-            <div className="md:w-1/2 w-full bg-gray-50 flex items-center justify-center p-8">
+            <div className="md:w-1/2 w-full bg-gray-50 flex items-center justify-center p-4 sm:p-8">
               <img
                 src={product.image}
                 alt={product.title}
-                className="w-full h-80 object-contain rounded-lg shadow"
+                className="w-full h-64 sm:h-80 object-contain rounded-lg shadow"
               />
             </div>
-            <div className="md:w-1/2 w-full flex flex-col justify-between p-8">
+            <div className="md:w-1/2 w-full flex flex-col justify-between p-4 sm:p-8">
               <div>
-                <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                <h3 className="text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2">
                   <InfoOutlinedIcon className="text-blue-500" />
                   {product.title}
                 </h3>
@@ -115,18 +107,20 @@ export default function ProductModal({ id, onClose }) {
                     ({product.rating?.count || 0} reviews)
                   </span>
                 </div>
-                <p className="text-gray-700 mb-6 text-base leading-relaxed">
+                <p className="text-gray-700 mb-6 text-sm sm:text-base leading-relaxed">
                   {product.description}
                 </p>
               </div>
-              <div className="flex items-center gap-2 mt-4">
-                <AttachMoneyIcon className="text-blue-600 text-3xl" />
-                <span className="text-3xl font-bold text-blue-700">
-                  ${product.price}
-                </span>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
+                <div className="flex items-center gap-2">
+                  <AttachMoneyIcon className="text-blue-600 text-2xl sm:text-3xl" />
+                  <span className="text-2xl sm:text-3xl font-bold text-blue-700">
+                    ${product.price}
+                  </span>
+                </div>
                 <button
                   onClick={handleAddToCart}
-                  className="ml-auto !bg-blue-600 !hover:bg-blue-700 !text-white font-semibold px-6 py-2 rounded-lg shadow transition"
+                  className="w-full sm:w-auto !bg-blue-600 !hover:bg-blue-700 !text-white font-semibold px-6 py-2 rounded-lg shadow transition hover:shadow-lg"
                 >
                   Add to Cart
                 </button>
@@ -134,7 +128,9 @@ export default function ProductModal({ id, onClose }) {
             </div>
           </>
         ) : (
-          <div className="text-center text-gray-500">Product not found.</div>
+          <div className="text-center text-gray-500 p-8">
+            Product not found.
+          </div>
         )}
       </div>
     </div>
